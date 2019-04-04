@@ -8,7 +8,6 @@ import androidx.annotation.NonNull;
 import com.bumptech.glide.Glide;
 import com.bumptech.glide.Registry;
 import com.bumptech.glide.annotation.GlideModule;
-import com.bumptech.glide.integration.okhttp3.OkHttpUrlLoader;
 import com.bumptech.glide.load.model.GlideUrl;
 import com.bumptech.glide.module.LibraryGlideModule;
 import com.facebook.react.modules.network.OkHttpClientProvider;
@@ -19,20 +18,107 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.WeakHashMap;
 
-import okhttp3.Interceptor;
-import okhttp3.MediaType;
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.Response;
-import okhttp3.ResponseBody;
-import okio.Buffer;
-import okio.BufferedSource;
-import okio.ForwardingSource;
-import okio.Okio;
-import okio.Source;
+import expolib_v1.Interceptor;
+import expolib_v1.MediaType;
+import expolib_v1.OkHttpClient;
+import expolib_v1.Request;
+import expolib_v1.Response;
+import expolib_v1.ResponseBody;
+import expolib_v1.Buffer;
+import expolib_v1.BufferedSource;
+import expolib_v1.ForwardingSource;
+import expolib_v1.Okio;
+import expolib_v1.Source;
+
 
 @GlideModule
 public class FastImageOkHttpProgressGlideModule extends LibraryGlideModule {
+
+    private class OkHttpStreamFetcher implements DataFetcher<InputStream>, Callback {
+        private final Call.Factory client;
+        private final GlideUrl url;
+        private InputStream stream;
+        private ResponseBody responseBody;
+        private DataCallback<? super InputStream> callback;
+        // call may be accessed on the main thread while the object is in use on other threads. All other
+        // accesses to variables may occur on different threads, but only one at a time.
+        private volatile Call call;
+
+        // Public API.
+        @SuppressWarnings("WeakerAccess")
+        public OkHttpStreamFetcher(Call.Factory client, GlideUrl url) {
+            this.client = client;
+            this.url = url;
+        }
+
+
+        @Override
+        public void loadData(@NonNull Priority priority,
+                             @NonNull final DataCallback<? super InputStream> callback) {
+            Request.Builder requestBuilder = new Request.Builder().url(url.toStringUrl());
+            for (Map.Entry<String, String> headerEntry : url.getHeaders().entrySet()) {
+                String key = headerEntry.getKey();
+                requestBuilder.addHeader(key, headerEntry.getValue());
+            }
+            Request request = requestBuilder.build();
+            this.callback = callback;
+
+            call = client.newCall(request);
+            call.enqueue(this);
+        }
+
+        @Override
+        public void onFailure(@NonNull Call call, @NonNull IOException e) {
+            callback.onLoadFailed(e);
+        }
+
+        @Override
+        public void onResponse(@NonNull Call call, @NonNull Response response) {
+            responseBody = response.body();
+            if (response.isSuccessful()) {
+                long contentLength = Preconditions.checkNotNull(responseBody).contentLength();
+                stream = ContentLengthInputStream.obtain(responseBody.byteStream(), contentLength);
+                callback.onDataReady(stream);
+            } else {
+                callback.onLoadFailed(new HttpException(response.message(), response.code()));
+            }
+        }
+
+        @Override
+        public void cleanup() {
+            try {
+                if (stream != null) {
+                    stream.close();
+                }
+            } catch (IOException e) {
+                // Ignored
+            }
+            if (responseBody != null) {
+                responseBody.close();
+            }
+            callback = null;
+        }
+
+        @Override
+        public void cancel() {
+            Call local = call;
+            if (local != null) {
+                local.cancel();
+            }
+        }
+
+        @NonNull
+        @Override
+        public Class<InputStream> getDataClass() {
+            return InputStream.class;
+        }
+
+        @NonNull
+        @Override
+        public DataSource getDataSource() {
+            return DataSource.REMOTE;
+        }
+    }
 
     private static DispatchingProgressListener progressListener = new DispatchingProgressListener();
 
@@ -42,13 +128,33 @@ public class FastImageOkHttpProgressGlideModule extends LibraryGlideModule {
             @NonNull Glide glide,
             @NonNull Registry registry
     ) {
-        OkHttpClient client = OkHttpClientProvider
+       final OkHttpClient client = OkHttpClientProvider
                 .getOkHttpClient()
                 .newBuilder()
                 .addInterceptor(createInterceptor(progressListener))
                 .build();
-        OkHttpUrlLoader.Factory factory = new OkHttpUrlLoader.Factory(client);
-        registry.replace(GlideUrl.class, InputStream.class, factory);
+        registry.replace(GlideUrl.class, InputStream.class, new ModelLoaderFactory<GlideUrl, InputStream>() {
+            @NonNull
+            @Override
+            public ModelLoader<GlideUrl, InputStream> build(@NonNull MultiModelLoaderFactory multiFactory) {
+                return new ModelLoader<GlideUrl, InputStream>() {
+                    @Override
+                    public LoadData<InputStream> buildLoadData(@NonNull final GlideUrl glideUrl, int width, int height, @NonNull Options options) {
+                        return new LoadData<>(glideUrl, new OkHttpStreamFetcher(client, glideUrl));
+                    }
+
+                    @Override
+                    public boolean handles(@NonNull GlideUrl glideUrl) {
+                        return true;
+                    }
+                };
+            }
+
+            @Override
+            public void teardown() {
+                // Do nothing, this instance doesn't own the client.
+            }
+        });
     }
 
     private static Interceptor createInterceptor(final ResponseProgressListener listener) {
