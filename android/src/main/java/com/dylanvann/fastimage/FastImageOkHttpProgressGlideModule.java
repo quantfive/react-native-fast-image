@@ -1,4 +1,4 @@
-package com.quantfive.fastimage;
+package com.dylanvann.fastimage;
 
 import android.content.Context;
 import android.os.Handler;
