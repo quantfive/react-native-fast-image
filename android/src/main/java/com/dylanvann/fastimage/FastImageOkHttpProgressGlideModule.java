@@ -6,10 +6,20 @@ import android.os.Looper;
 import androidx.annotation.NonNull;
 
 import com.bumptech.glide.Glide;
+import com.bumptech.glide.Priority;
 import com.bumptech.glide.Registry;
 import com.bumptech.glide.annotation.GlideModule;
+import com.bumptech.glide.load.DataSource;
+import com.bumptech.glide.load.HttpException;
+import com.bumptech.glide.load.Options;
+import com.bumptech.glide.load.data.DataFetcher;
 import com.bumptech.glide.load.model.GlideUrl;
+import com.bumptech.glide.load.model.ModelLoader;
+import com.bumptech.glide.load.model.ModelLoaderFactory;
+import com.bumptech.glide.load.model.MultiModelLoaderFactory;
 import com.bumptech.glide.module.LibraryGlideModule;
+import com.bumptech.glide.util.ContentLengthInputStream;
+import com.bumptech.glide.util.Preconditions;
 import com.facebook.react.modules.network.OkHttpClientProvider;
 
 import java.io.IOException;
@@ -18,17 +28,19 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.WeakHashMap;
 
-import expolib_v1.Interceptor;
-import expolib_v1.MediaType;
-import expolib_v1.OkHttpClient;
-import expolib_v1.Request;
-import expolib_v1.Response;
-import expolib_v1.ResponseBody;
-import expolib_v1.Buffer;
-import expolib_v1.BufferedSource;
-import expolib_v1.ForwardingSource;
-import expolib_v1.Okio;
-import expolib_v1.Source;
+import expolib_v1.okhttp3.Call;
+import expolib_v1.okhttp3.Callback;
+import expolib_v1.okhttp3.Interceptor;
+import expolib_v1.okhttp3.MediaType;
+import expolib_v1.okhttp3.OkHttpClient;
+import expolib_v1.okhttp3.Request;
+import expolib_v1.okhttp3.Response;
+import expolib_v1.okhttp3.ResponseBody;
+import expolib_v1.okio.Buffer;
+import expolib_v1.okio.BufferedSource;
+import expolib_v1.okio.ForwardingSource;
+import expolib_v1.okio.Okio;
+import expolib_v1.okio.Source;
 
 
 @GlideModule
