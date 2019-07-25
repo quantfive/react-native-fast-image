@@ -1,4 +1,17 @@
 package com.dylanvann.fastimage;
+import com.bumptech.glide.load.DataSource;
+import com.bumptech.glide.load.HttpException;
+import com.bumptech.glide.load.Options;
+import com.bumptech.glide.load.data.DataFetcher;
+import com.bumptech.glide.load.model.ModelLoader;
+import com.bumptech.glide.load.model.ModelLoaderFactory;
+import com.bumptech.glide.load.model.MultiModelLoaderFactory;
+import com.bumptech.glide.Priority;
+import com.bumptech.glide.load.model.ModelLoader;
+import com.bumptech.glide.load.model.ModelLoaderFactory;
+import com.bumptech.glide.load.model.MultiModelLoaderFactory;
+import com.bumptech.glide.util.ContentLengthInputStream;
+import com.bumptech.glide.util.Preconditions;
 
 import android.content.Context;
 import android.os.Handler;
@@ -6,20 +19,11 @@ import android.os.Looper;
 import androidx.annotation.NonNull;
 
 import com.bumptech.glide.Glide;
-import com.bumptech.glide.Priority;
 import com.bumptech.glide.Registry;
 import com.bumptech.glide.annotation.GlideModule;
-import com.bumptech.glide.load.DataSource;
-import com.bumptech.glide.load.HttpException;
-import com.bumptech.glide.load.Options;
-import com.bumptech.glide.load.data.DataFetcher;
+import com.bumptech.glide.integration.okhttp3.OkHttpUrlLoader;
 import com.bumptech.glide.load.model.GlideUrl;
-import com.bumptech.glide.load.model.ModelLoader;
-import com.bumptech.glide.load.model.ModelLoaderFactory;
-import com.bumptech.glide.load.model.MultiModelLoaderFactory;
 import com.bumptech.glide.module.LibraryGlideModule;
-import com.bumptech.glide.util.ContentLengthInputStream;
-import com.bumptech.glide.util.Preconditions;
 import com.facebook.react.modules.network.OkHttpClientProvider;
 
 import java.io.IOException;
@@ -41,7 +45,6 @@ import expolib_v1.okio.BufferedSource;
 import expolib_v1.okio.ForwardingSource;
 import expolib_v1.okio.Okio;
 import expolib_v1.okio.Source;
-
 
 @GlideModule
 public class FastImageOkHttpProgressGlideModule extends LibraryGlideModule {
@@ -140,7 +143,7 @@ public class FastImageOkHttpProgressGlideModule extends LibraryGlideModule {
             @NonNull Glide glide,
             @NonNull Registry registry
     ) {
-       final OkHttpClient client = OkHttpClientProvider
+        final OkHttpClient client = OkHttpClientProvider
                 .getOkHttpClient()
                 .newBuilder()
                 .addInterceptor(createInterceptor(progressListener))
